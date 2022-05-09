@@ -41,6 +41,11 @@ pub struct ProfileKeyCredentialIssuanceProof {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
+pub struct ProfileKeyCredentialV3IssuanceProof {
+    poksho_proof: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
 pub struct PniCredentialIssuanceProof {
     poksho_proof: Vec<u8>,
 }
@@ -87,6 +92,19 @@ pub struct ProfileKeyCredentialPresentationProofV1 {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ProfileKeyCredentialPresentationProofV2 {
+    C_x0: RistrettoPoint,
+    C_x1: RistrettoPoint,
+    C_y1: RistrettoPoint,
+    C_y2: RistrettoPoint,
+    C_y3: RistrettoPoint,
+    C_y4: RistrettoPoint,
+    C_V: RistrettoPoint,
+    C_z: RistrettoPoint,
+    poksho_proof: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ProfileKeyCredentialV3PresentationProof {
     C_x0: RistrettoPoint,
     C_x1: RistrettoPoint,
     C_y1: RistrettoPoint,

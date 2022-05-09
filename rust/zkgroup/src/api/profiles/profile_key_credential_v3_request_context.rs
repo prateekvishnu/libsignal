@@ -16,7 +16,7 @@ pub struct ProfileKeyCredentialV3RequestContext {
     pub(crate) key_pair: crypto::profile_key_credential_request::KeyPair,
     pub(crate) ciphertext_with_secret_nonce:
         crypto::profile_key_credential_request::CiphertextWithSecretNonce,
-    pub(crate) proof: crypto::proofs::ProfileKeyCredentialV3RequestProof,
+    pub(crate) proof: crypto::proofs::ProfileKeyCredentialRequestProof,
 }
 
 impl ProfileKeyCredentialV3RequestContext {
