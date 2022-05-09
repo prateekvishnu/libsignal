@@ -23,6 +23,8 @@ pub struct ServerSecretParams {
     receipt_credentials_key_pair:
         crypto::credentials::KeyPair<crypto::credentials::ReceiptCredential>,
     pni_credentials_key_pair: crypto::credentials::KeyPair<crypto::credentials::PniCredential>,
+    profile_key_credentials_v3_key_pair:
+        crypto::credentials::KeyPair<crypto::credentials::ProfileKeyCredentialV3>,
 }
 
 #[derive(Copy, Clone, Serialize, Deserialize)]
@@ -33,6 +35,7 @@ pub struct ServerPublicParams {
     sig_public_key: crypto::signature::PublicKey,
     receipt_credentials_public_key: crypto::credentials::PublicKey,
     pni_credentials_public_key: crypto::credentials::PublicKey,
+    profile_key_credentials_v3_public_key: crypto::credentials::PublicKey,
 }
 
 impl ServerSecretParams {
@@ -47,6 +50,7 @@ impl ServerSecretParams {
         let sig_key_pair = crypto::signature::KeyPair::generate(&mut sho);
         let receipt_credentials_key_pair = crypto::credentials::KeyPair::generate(&mut sho);
         let pni_credentials_key_pair = crypto::credentials::KeyPair::generate(&mut sho);
+        let profile_key_credentials_v3_key_pair = crypto::credentials::KeyPair::generate(&mut sho);
 
         Self {
             reserved: Default::default(),
@@ -55,6 +59,7 @@ impl ServerSecretParams {
             sig_key_pair,
             receipt_credentials_key_pair,
             pni_credentials_key_pair,
+            profile_key_credentials_v3_key_pair,
         }
     }
 
@@ -68,6 +73,7 @@ impl ServerSecretParams {
             sig_public_key: self.sig_key_pair.get_public_key(),
             receipt_credentials_public_key: self.receipt_credentials_key_pair.get_public_key(),
             pni_credentials_public_key: self.pni_credentials_key_pair.get_public_key(),
+            profile_key_credentials_v3_public_key: self.profile_key_credentials_v3_key_pair.get_public_key(),
         }
     }
 
