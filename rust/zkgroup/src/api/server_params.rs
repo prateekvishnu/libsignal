@@ -349,6 +349,52 @@ impl ServerSecretParams {
         })
     }
 
+    pub fn issue_profile_key_credential_v3(
+        &self,
+        randomness: RandomnessBytes,
+        request: &api::profiles::ProfileKeyCredentialRequest,
+        uid_bytes: UidBytes,
+        commitment: api::profiles::ProfileKeyCommitment,
+    ) -> Result<api::profiles::ProfileKeyCredentialV3Response, ZkGroupVerificationFailure> {
+        let mut sho = Sho::new(
+            b"Signal_ZKGroup_20220508_Random_ServerSecretParams_IssueProfileKeyCredentialV3",
+            &randomness,
+        );
+
+        request.proof.verify(
+            request.public_key,
+            request.ciphertext,
+            commitment.commitment,
+        )?;
+
+        let uid = crypto::uid_struct::UidStruct::new(uid_bytes);
+        let blinded_credential_with_secret_nonce = self
+            .profile_key_credentials_v3_key_pair
+            .create_blinded_profile_key_credential_v3(
+                uid,
+                request.public_key,
+                request.ciphertext,
+                &mut sho,
+            );
+
+        let proof = crypto::proofs::ProfileKeyCredentialV3IssuanceProof::new(
+            self.profile_key_credentials_v3_key_pair,
+            request.public_key,
+            request.ciphertext,
+            blinded_credential_with_secret_nonce,
+            uid,
+            &mut sho,
+        );
+
+        Ok(api::profiles::ProfileKeyCredentialV3Response {
+            reserved: Default::default(),
+            blinded_credential: blinded_credential_with_secret_nonce
+                .get_blinded_profile_key_credential_v3(),
+            proof,
+        })
+    }
+
+
     pub fn issue_pni_credential(
         &self,
         randomness: RandomnessBytes,
@@ -595,6 +641,45 @@ impl ServerPublicParams {
         }
     }
 
+    pub fn create_profile_key_credential_v3_request_context(
+        &self,
+        randomness: RandomnessBytes,
+        uid_bytes: UidBytes,
+        profile_key: api::profiles::ProfileKey,
+    ) -> api::profiles::ProfileKeyCredentialV3RequestContext {
+        let mut sho = Sho::new(
+            b"Signal_ZKGroup_20220528_Random_ServerPublicParams_CreateProfileKeyCredentialV3RequestContext",
+            &randomness,
+        );
+        let profile_key_struct =
+            crypto::profile_key_struct::ProfileKeyStruct::new(profile_key.bytes, uid_bytes);
+
+        let commitment_with_secret_nonce =
+            crypto::profile_key_commitment::CommitmentWithSecretNonce::new(
+                profile_key_struct,
+                uid_bytes,
+            );
+
+        let key_pair = crypto::profile_key_credential_request::KeyPair::generate(&mut sho);
+        let ciphertext_with_secret_nonce = key_pair.encrypt(profile_key_struct, &mut sho);
+
+        let proof = crypto::proofs::ProfileKeyCredentialRequestProof::new(
+            key_pair,
+            ciphertext_with_secret_nonce,
+            commitment_with_secret_nonce,
+            &mut sho,
+        );
+
+        api::profiles::ProfileKeyCredentialV3RequestContext {
+            reserved: Default::default(),
+            uid_bytes,
+            profile_key_bytes: profile_key_struct.bytes,
+            key_pair,
+            ciphertext_with_secret_nonce,
+            proof,
+        }
+    }
+
     pub fn create_pni_credential_request_context(
         &self,
         randomness: RandomnessBytes,
@@ -636,6 +721,31 @@ impl ServerPublicParams {
             .decrypt_blinded_profile_key_credential(response.blinded_credential);
 
         Ok(api::profiles::ProfileKeyCredential {
+            reserved: Default::default(),
+            credential,
+            uid_bytes: context.uid_bytes,
+            profile_key_bytes: context.profile_key_bytes,
+        })
+    }
+
+    pub fn receive_profile_key_credential_v3(
+        &self,
+        context: &api::profiles::ProfileKeyCredentialV3RequestContext,
+        response: &api::profiles::ProfileKeyCredentialV3Response,
+    ) -> Result<api::profiles::ProfileKeyCredentialV3, ZkGroupVerificationFailure> {
+        response.proof.verify(
+            self.profile_key_credentials_v3_public_key,
+            context.key_pair.get_public_key(),
+            context.uid_bytes,
+            context.ciphertext_with_secret_nonce.get_ciphertext(),
+            response.blinded_credential,
+        )?;
+
+        let credential = context
+            .key_pair
+            .decrypt_blinded_profile_key_credential_v3(response.blinded_credential);
+
+        Ok(api::profiles::ProfileKeyCredentialV3 {
             reserved: Default::default(),
             credential,
             uid_bytes: context.uid_bytes,
