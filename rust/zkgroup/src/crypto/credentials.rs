@@ -144,13 +144,6 @@ pub struct ProfileKeyCredential {
 }
 
 #[derive(Copy, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ProfileKeyCredentialV3 {
-    pub(crate) t: Scalar,
-    pub(crate) U: RistrettoPoint,
-    pub(crate) V: RistrettoPoint,
-}
-
-#[derive(Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BlindedProfileKeyCredentialWithSecretNonce {
     pub(crate) rprime: Scalar,
     pub(crate) t: Scalar,
@@ -166,6 +159,31 @@ pub struct BlindedProfileKeyCredential {
     pub(crate) S1: RistrettoPoint,
     pub(crate) S2: RistrettoPoint,
 }
+
+#[derive(Copy, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProfileKeyCredentialV3 {
+    pub(crate) t: Scalar,
+    pub(crate) U: RistrettoPoint,
+    pub(crate) V: RistrettoPoint,
+}
+
+#[derive(Copy, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BlindedProfileKeyCredentialV3WithSecretNonce {
+    pub(crate) rprime: Scalar,
+    pub(crate) t: Scalar,
+    pub(crate) U: RistrettoPoint,
+    pub(crate) S1: RistrettoPoint,
+    pub(crate) S2: RistrettoPoint,
+}
+
+#[derive(Copy, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BlindedProfileKeyCredentialV3 {
+    pub(crate) t: Scalar,
+    pub(crate) U: RistrettoPoint,
+    pub(crate) S1: RistrettoPoint,
+    pub(crate) S2: RistrettoPoint,
+}
+
 
 #[derive(Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PniCredential {
@@ -442,6 +460,33 @@ impl KeyPair<ProfileKeyCredential> {
     }
 }
 
+impl KeyPair<ProfileKeyCredentialV3> {
+    pub fn create_blinded_profile_key_credential_v3(
+        &self,
+        uid: uid_struct::UidStruct,
+        public_key: profile_key_credential_request::PublicKey,
+        ciphertext: profile_key_credential_request::Ciphertext,
+        sho: &mut Sho,
+    ) -> BlindedProfileKeyCredentialV3WithSecretNonce {
+        let M = [uid.M1, uid.M2];
+
+        let (t, U, Vprime) = self.credential_core(&M, sho);
+        let rprime = sho.get_scalar();
+        let R1 = rprime * RISTRETTO_BASEPOINT_POINT;
+        let R2 = rprime * public_key.Y + Vprime;
+        let S1 = R1 + (self.y[3] * ciphertext.D1) + (self.y[4] * ciphertext.E1);
+        let S2 = R2 + (self.y[3] * ciphertext.D2) + (self.y[4] * ciphertext.E2);
+        BlindedProfileKeyCredentialV3WithSecretNonce {
+            rprime,
+            t,
+            U,
+            S1,
+            S2,
+        }
+    }
+}
+
+
 impl KeyPair<PniCredential> {
     pub fn create_blinded_pni_credential(
         &self,
@@ -502,6 +547,17 @@ impl KeyPair<ReceiptCredential> {
 impl BlindedProfileKeyCredentialWithSecretNonce {
     pub fn get_blinded_profile_key_credential(&self) -> BlindedProfileKeyCredential {
         BlindedProfileKeyCredential {
+            t: self.t,
+            U: self.U,
+            S1: self.S1,
+            S2: self.S2,
+        }
+    }
+}
+
+impl BlindedProfileKeyCredentialV3WithSecretNonce {
+    pub fn get_blinded_profile_key_credential_v3(&self) -> BlindedProfileKeyCredentialV3 {
+        BlindedProfileKeyCredentialV3 {
             t: self.t,
             U: self.U,
             S1: self.S1,
