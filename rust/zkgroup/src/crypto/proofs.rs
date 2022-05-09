@@ -111,6 +111,7 @@ pub struct ProfileKeyCredentialV3PresentationProof {
     C_y2: RistrettoPoint,
     C_y3: RistrettoPoint,
     C_y4: RistrettoPoint,
+    C_y5: RistrettoPoint,
     C_V: RistrettoPoint,
     C_z: RistrettoPoint,
     poksho_proof: Vec<u8>,
@@ -1360,6 +1361,216 @@ impl ProfileKeyCredentialPresentationProofV1 {
         }
     }
 }
+
+impl ProfileKeyCredentialV3PresentationProof {
+    pub fn get_poksho_statement() -> poksho::Statement {
+        let mut st = poksho::Statement::new();
+        st.add("C_z", &[("z", "G_z")]);
+        st.add("Z", &[("z", "I")]);
+        st.add("C_x1", &[("t", "C_x0"), ("z0", "G_x0"), ("z", "G_x1")]);
+        st.add(
+            "A+B",
+            &[
+                ("a1", "G_a1"),
+                ("a2", "G_a2"),
+                ("b1", "G_b1"),
+                ("b2", "G_b2"),
+            ],
+        );
+        st.add("C_y2-E_A2", &[("z", "G_y2"), ("a2", "-E_A1")]);
+        st.add("E_A1", &[("a1", "C_y1"), ("z1", "G_y1")]);
+        st.add("C_y4-E_B2", &[("z", "G_y4"), ("b2", "-E_B1")]);
+        st.add("E_B1", &[("b1", "C_y3"), ("z2", "G_y3")]);
+        st.add("0", &[("z1", "I"), ("a1", "Z")]);
+        st.add("0", &[("z2", "I"), ("b1", "Z")]);
+        st
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        uid_enc_key_pair: uid_encryption::KeyPair,
+        profile_key_enc_key_pair: profile_key_encryption::KeyPair,
+        credentials_public_key: credentials::PublicKey,
+        credential: credentials::ProfileKeyCredentialV3,
+        uid_ciphertext: uid_encryption::Ciphertext,
+        profile_key_ciphertext: profile_key_encryption::Ciphertext,
+        uid_bytes: UidBytes,
+        profile_key_bytes: ProfileKeyBytes,
+        sho: &mut Sho,
+    ) -> Self {
+        let credentials_system = credentials::SystemParams::get_hardcoded();
+        let uid_system = uid_encryption::SystemParams::get_hardcoded();
+        let profile_key_system = profile_key_encryption::SystemParams::get_hardcoded();
+        let uid = uid_struct::UidStruct::new(uid_bytes);
+        let profile_key = profile_key_struct::ProfileKeyStruct::new(profile_key_bytes, uid_bytes);
+
+        let z = sho.get_scalar();
+
+        let C_y1 = z * credentials_system.G_y[1] + uid.M1;
+        let C_y2 = z * credentials_system.G_y[2] + uid.M2;
+        let C_y3 = z * credentials_system.G_y[3] + profile_key.M3;
+        let C_y4 = z * credentials_system.G_y[4] + profile_key.M4;
+        let C_y5 = z * credentials_system.G_y[5]; // TODO TREVOR CHECK
+
+        let C_x0 = z * credentials_system.G_x0 + credential.U;
+        let C_V = z * credentials_system.G_V + credential.V;
+        let C_x1 = z * credentials_system.G_x1 + credential.t * credential.U;
+        let C_z = z * credentials_system.G_z;
+
+        let z0 = -z * credential.t;
+        let z1 = -z * uid_enc_key_pair.a1;
+        let z2 = -z * profile_key_enc_key_pair.b1;
+
+        let I = credentials_public_key.I;
+        let Z = z * I;
+
+        // Scalars listed in order of stmts for debugging
+        let mut scalar_args = poksho::ScalarArgs::new();
+        scalar_args.add("z", z);
+        scalar_args.add("t", credential.t);
+        scalar_args.add("z0", z0);
+        scalar_args.add("a1", uid_enc_key_pair.a1);
+        scalar_args.add("a2", uid_enc_key_pair.a2);
+        scalar_args.add("b1", profile_key_enc_key_pair.b1);
+        scalar_args.add("b2", profile_key_enc_key_pair.b2);
+        scalar_args.add("z1", z1);
+        scalar_args.add("z2", z2);
+
+        // Points listed in order of stmts for debugging
+        let mut point_args = poksho::PointArgs::new();
+        point_args.add("C_z", C_z);
+        point_args.add("G_z", credentials_system.G_z);
+        point_args.add("Z", Z);
+        point_args.add("I", I);
+
+        point_args.add("C_x1", C_x1);
+        point_args.add("C_x0", C_x0);
+        point_args.add("G_x0", credentials_system.G_x0);
+        point_args.add("G_x1", credentials_system.G_x1);
+
+        point_args.add("A+B", uid_enc_key_pair.A + profile_key_enc_key_pair.B);
+        point_args.add("G_a1", uid_system.G_a1);
+        point_args.add("G_a2", uid_system.G_a2);
+        point_args.add("G_b1", profile_key_system.G_b1);
+        point_args.add("G_b2", profile_key_system.G_b2);
+
+        point_args.add("C_y2-E_A2", C_y2 - uid_ciphertext.E_A2);
+        point_args.add("G_y2", credentials_system.G_y[2]);
+        point_args.add("-E_A1", -uid_ciphertext.E_A1);
+        point_args.add("E_A1", uid_ciphertext.E_A1);
+        point_args.add("C_y1", C_y1);
+        point_args.add("G_y1", credentials_system.G_y[1]);
+
+        point_args.add("C_y4-E_B2", C_y4 - profile_key_ciphertext.E_B2);
+        point_args.add("G_y4", credentials_system.G_y[4]);
+        point_args.add("-E_B1", -profile_key_ciphertext.E_B1);
+        point_args.add("E_B1", profile_key_ciphertext.E_B1);
+        point_args.add("C_y3", C_y3);
+        point_args.add("G_y3", credentials_system.G_y[3]);
+        point_args.add("0", RistrettoPoint::identity());
+
+        let poksho_proof = Self::get_poksho_statement()
+            .prove(
+                &scalar_args,
+                &point_args,
+                &[],
+                &sho.squeeze(RANDOMNESS_LEN)[..],
+            )
+            .unwrap();
+
+        ProfileKeyCredentialV3PresentationProof {
+            C_y1,
+            C_y2,
+            C_y3,
+            C_y4,
+            C_y5,
+            C_x0,
+            C_x1,
+            C_V,
+            C_z,
+            poksho_proof,
+        }
+    }
+
+    pub fn verify(
+        &self,
+        credentials_key_pair: credentials::KeyPair<credentials::ProfileKeyCredentialV3>,
+        uid_ciphertext: uid_encryption::Ciphertext,
+        uid_enc_public_key: uid_encryption::PublicKey,
+        profile_key_ciphertext: profile_key_encryption::Ciphertext,
+        profile_key_enc_public_key: profile_key_encryption::PublicKey,
+    ) -> Result<(), ZkGroupVerificationFailure> {
+        let uid_enc_system = uid_encryption::SystemParams::get_hardcoded();
+        let profile_key_enc_system = profile_key_encryption::SystemParams::get_hardcoded();
+        let credentials_system = credentials::SystemParams::get_hardcoded();
+
+        let Self {
+            C_x0,
+            C_x1,
+            C_y1,
+            C_y2,
+            C_y3,
+            C_y4,
+            C_y5,
+            C_V,
+            C_z,
+            poksho_proof,
+        } = self;
+
+        let (C_x0, C_x1, C_y1, C_y2, C_y3, C_y4, C_V, C_z) =
+            (*C_x0, *C_x1, *C_y1, *C_y2, *C_y3, *C_y4, *C_V, *C_z);
+
+        let credentials::KeyPair {
+            W,
+            x0,
+            x1,
+            y: OneBased([y1, y2, y3, y4, y5]),
+            I,
+            ..
+        } = credentials_key_pair;
+
+        let Z =
+            C_V - W - x0 * C_x0 - x1 * C_x1 - (y1 * C_y1) - (y2 * C_y2) - (y3 * C_y3) - (y4 * C_y4) - (y5 * C_y5);
+
+        // Points listed in order of stmts for debugging
+        let mut point_args = poksho::PointArgs::new();
+        point_args.add("C_z", C_z);
+        point_args.add("G_z", credentials_system.G_z);
+        point_args.add("Z", Z);
+        point_args.add("I", I);
+        point_args.add("C_x1", C_x1);
+        point_args.add("C_x0", C_x0);
+        point_args.add("G_x0", credentials_system.G_x0);
+        point_args.add("G_x1", credentials_system.G_x1);
+
+        point_args.add("A+B", uid_enc_public_key.A + profile_key_enc_public_key.B);
+        point_args.add("G_a1", uid_enc_system.G_a1);
+        point_args.add("G_a2", uid_enc_system.G_a2);
+        point_args.add("G_b1", profile_key_enc_system.G_b1);
+        point_args.add("G_b2", profile_key_enc_system.G_b2);
+
+        point_args.add("C_y2-E_A2", C_y2 - uid_ciphertext.E_A2);
+        point_args.add("G_y2", credentials_system.G_y[2]);
+        point_args.add("-E_A1", -uid_ciphertext.E_A1);
+        point_args.add("E_A1", uid_ciphertext.E_A1);
+        point_args.add("C_y1", C_y1);
+        point_args.add("G_y1", credentials_system.G_y[1]);
+
+        point_args.add("C_y4-E_B2", C_y4 - profile_key_ciphertext.E_B2);
+        point_args.add("G_y4", credentials_system.G_y[4]);
+        point_args.add("-E_B1", -profile_key_ciphertext.E_B1);
+        point_args.add("E_B1", profile_key_ciphertext.E_B1);
+        point_args.add("C_y3", C_y3);
+        point_args.add("G_y3", credentials_system.G_y[3]);
+        point_args.add("0", RistrettoPoint::identity());
+
+        match Self::get_poksho_statement().verify_proof(poksho_proof, &point_args, &[]) {
+            Err(_) => Err(ZkGroupVerificationFailure),
+            Ok(_) => Ok(()),
+        }
+    }
+}
+
 
 impl ProfileKeyCredentialPresentationProofV2 {
     pub fn get_poksho_statement() -> poksho::Statement {

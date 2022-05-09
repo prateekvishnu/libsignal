@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct ProfileKeyCredentialV3Presentation {
-    pub(crate) reserved: ReservedBytes,
+    pub(crate) version: ReservedBytes,
     pub(crate) proof: crypto::proofs::ProfileKeyCredentialV3PresentationProof,
     pub(crate) uid_enc_ciphertext: crypto::uid_encryption::Ciphertext,
     pub(crate) profile_key_enc_ciphertext: crypto::profile_key_encryption::Ciphertext,

@@ -233,6 +233,24 @@ impl ServerSecretParams {
         )
     }
 
+    pub fn verify_profile_key_credential_v3_presentation(
+        &self,
+        group_public_params: api::groups::GroupPublicParams,
+        presentation: &api::profiles::ProfileKeyCredentialV3Presentation,
+    ) -> Result<(), ZkGroupVerificationFailure> {
+        let credentials_key_pair = self.profile_key_credentials_v3_key_pair;
+        let uid_enc_public_key = group_public_params.uid_enc_public_key;
+        let profile_key_enc_public_key = group_public_params.profile_key_enc_public_key;
+
+        presentation.proof.verify(
+            credentials_key_pair,
+            presentation.uid_enc_ciphertext,
+            uid_enc_public_key,
+            presentation.profile_key_enc_ciphertext,
+            profile_key_enc_public_key,
+        )
+    }
+
     pub fn verify_pni_credential_presentation(
         &self,
         group_public_params: api::groups::GroupPublicParams,
@@ -870,6 +888,48 @@ impl ServerPublicParams {
 
         api::profiles::ProfileKeyCredentialPresentationV2 {
             version: [PRESENTATION_VERSION_2],
+            proof,
+            uid_enc_ciphertext: uuid_ciphertext.ciphertext,
+            profile_key_enc_ciphertext: profile_key_ciphertext.ciphertext,
+        }
+    }
+
+    // TREVOR WIP
+    pub fn create_profile_key_credential_v3_presentation(
+        &self,
+        randomness: RandomnessBytes,
+        group_secret_params: api::groups::GroupSecretParams,
+        profile_key_credential_v3: api::profiles::ProfileKeyCredentialV3,
+    ) -> api::profiles::ProfileKeyCredentialV3Presentation {
+        let mut sho = Sho::new(
+            b"Signal_ZKGroup_20220508_Random_ServerPublicParams_CreateProfileKeyCredentialV3Presentation",
+            &randomness,
+        );
+
+        let uid_enc_key_pair = group_secret_params.uid_enc_key_pair;
+        let profile_key_enc_key_pair = group_secret_params.profile_key_enc_key_pair;
+        let credentials_public_key = self.profile_key_credentials_public_key;
+
+        let uuid_ciphertext = group_secret_params.encrypt_uuid(profile_key_credential_v3.uid_bytes);
+        let profile_key_ciphertext = group_secret_params.encrypt_profile_key_bytes(
+            profile_key_credential_v3.profile_key_bytes,
+            profile_key_credential_v3.uid_bytes,
+        );
+
+        let proof = crypto::proofs::ProfileKeyCredentialV3PresentationProof::new(
+            uid_enc_key_pair,
+            profile_key_enc_key_pair,
+            credentials_public_key,
+            profile_key_credential_v3.credential,
+            uuid_ciphertext.ciphertext,
+            profile_key_ciphertext.ciphertext,
+            profile_key_credential_v3.uid_bytes,
+            profile_key_credential_v3.profile_key_bytes,
+            &mut sho,
+        );
+
+        api::profiles::ProfileKeyCredentialV3Presentation {
+            version: [PROFILE_KEY_CREDENTIAL_VERSION_3],
             proof,
             uid_enc_ciphertext: uuid_ciphertext.ciphertext,
             profile_key_enc_ciphertext: profile_key_ciphertext.ciphertext,
