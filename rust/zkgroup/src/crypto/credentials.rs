@@ -17,7 +17,7 @@ use crate::crypto::receipt_struct::ReceiptStruct;
 use crate::crypto::uid_struct;
 use crate::crypto::{profile_key_credential_request, receipt_credential_request, receipt_struct};
 use crate::{
-    NUM_AUTH_CRED_ATTRIBUTES, NUM_PROFILE_KEY_CRED_ATTRIBUTES, NUM_RECEIPT_CRED_ATTRIBUTES,
+    NUM_AUTH_CRED_ATTRIBUTES, NUM_PROFILE_KEY_CRED_ATTRIBUTES, NUM_PROFILE_KEY_CRED_V3_ATTRIBUTES, NUM_RECEIPT_CRED_ATTRIBUTES,
 };
 
 use lazy_static::lazy_static;
@@ -68,6 +68,11 @@ impl AttrScalars for ProfileKeyCredential {
     // Store four scalars for backwards compatibility.
     type Storage = [Scalar; 4];
     const NUM_ATTRS: usize = NUM_PROFILE_KEY_CRED_ATTRIBUTES;
+}
+impl AttrScalars for ProfileKeyCredentialV3 {
+    // Store four scalars for backwards compatibility.
+    type Storage = [Scalar; 5];
+    const NUM_ATTRS: usize = NUM_PROFILE_KEY_CRED_V3_ATTRIBUTES;
 }
 impl AttrScalars for ReceiptCredential {
     // Store four scalars for backwards compatibility.
@@ -135,6 +140,14 @@ pub struct ProfileKeyCredential {
     pub(crate) U: RistrettoPoint,
     pub(crate) V: RistrettoPoint,
 }
+
+#[derive(Copy, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProfileKeyCredentialV3 {
+    pub(crate) t: Scalar,
+    pub(crate) U: RistrettoPoint,
+    pub(crate) V: RistrettoPoint,
+}
+
 #[derive(Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BlindedProfileKeyCredentialWithSecretNonce {
     pub(crate) rprime: Scalar,
